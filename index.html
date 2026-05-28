@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>寶可夢生態系：隨機天敵版</title>
+    <style>
+        /* 莫蘭迪紫主題色系 */
+        :root {
+            --bg-color: #f0eef3;
+            --primary-color: #8c7e99;
+            --secondary-color: #b5acbe;
+            --text-main: #4a4152;
+            --white: #ffffff;
+            --danger: #d98a8a;
+            --success: #8bb89c;
+            --board-bg: #e6e2ea;
+            --modal-bg: rgba(0, 0, 0, 0.7);
+        }
+        
+        body { font-family: '微軟正黑體', sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+        h1 { color: var(--primary-color); margin: 10px 0; font-size: 2em; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+        
+        button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; transition: 0.3s; font-weight: bold; }
+        button:hover { background-color: #72647d; }
+        button:disabled { background-color: #d1cbd6; cursor: not-allowed; }
+        
+        /* 設置畫面 & 扭蛋區 */
+        #setup-screen { background: var(--white); padding: 40px; border-radius: 16px; box-shadow: 0 8px 24px rgba(140, 126, 153, 0.15); text-align: center; width: 80%; max-width: 650px; margin-top: 50px; }
+        .setup-row { margin: 20px 0; display: flex; align-items: center; justify-content: center; gap: 15px; }
+        input[type="text"] { padding: 12px; font-size: 16px; border: 2px solid var(--secondary-color); border-radius: 8px; width: 200px; outline: none; }
+        input[type="text"]:focus { border-color: var(--primary-color); }
+        
+        .gacha-btn { background: linear-gradient(135deg, #b5acbe 0%, #8c7e99 100%); color: #fff; border: none; padding: 15px 30px; font-size: 1.2em; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 15px rgba(140, 126, 153, 0.4); transition: transform 0.2s; }
+        .gacha-btn:active { transform: scale(0.95); }
+        .gacha-result { font-size: 1.3em; margin-top: 20px; font-weight: bold; color: var(--primary-color); min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .gacha-img-preview { width: 80px; height: 80px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); }
+        
+        /* 遊戲畫面 */
+        #game-screen { display: none; width: 100%; max-width: 1500px; gap: 20px; flex-direction: row; align-items: flex-start; justify-content: center; margin-top: 10px; }
+        
+        /* 大富翁地圖 5x5 */
+        .board { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr); gap: 10px; background: var(--board-bg); padding: 15px; border-radius: 16px; width: 850px; height: 850px; box-shadow: 0 8px 24px rgba(140, 126, 153, 0.15); flex-shrink: 0; }
+        
+        .tile { background: var(--white); border-radius: 12px; border: 3px solid var(--secondary-color); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 12px 5px; position: relative; text-align: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.02); }
+        .tile-pic { font-size: 45px; margin: 5px 0; filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.1)); line-height: 1; }
+        .tile-title { font-size: 1em; font-weight: bold; color: var(--primary-color); margin-bottom: 2px; }
+        .tile-desc { font-size: 0.75em; color: #777; font-weight: bold; }
+        
+        /* 中間控制區 & 遊戲規則 */
+        .center-panel { grid-column: 2 / 5; grid-row: 2 / 5; background: var(--white); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; box-shadow: inset 0 0 15px rgba(140, 126, 153, 0.1); }
+        .rules-box { background: #faf9fb; border: 2px dashed var(--secondary-color); border-radius: 12px; padding: 15px; text-align: left; font-size: 0.85em; width: 95%; color: var(--text-main); line-height: 1.5; }
+        .rules-box h3 { text-align: center; margin: 0 0 8px 0; color: var(--primary-color); font-size: 1.2em; }
+        .dice-area { text-align: center; margin-bottom: 5px; }
+        .dice-result { font-size: 3.5em; margin: 10px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.1); }
+        .log-box { width: 95%; flex-grow: 1; max-height: 100px; background: #faf9fb; border-radius: 10px; padding: 12px; overflow-y: auto; font-size: 0.9em; line-height: 1.5; border: 1px solid var(--secondary-color); font-weight: bold; }
+        
+        /* 玩家 Token 與技能標籤 */
+        .players-container { position: absolute; bottom: 8px; left: 0; right: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; min-height: 40px; }
+        .player-token { position: relative; transition: transform 0.3s ease; z-index: 10; }
+        .player-token img { width: 45px; height: 45px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)); }
+        
+        .skill-tags { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); display: flex; gap: 2px; white-space: nowrap; z-index: 11; }
+        .skill-tag { background: rgba(74, 65, 82, 0.9); color: white; font-size: 10px; padding: 2px 5px; border-radius: 4px; font-weight: bold; border: 1px solid #fff; }
+        
+        /* 浮動數字特效 */
+        .floating-text { position: absolute; font-size: 28px; font-weight: 900; animation: floatUp 1.5s ease-out forwards; pointer-events: none; z-index: 20; text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff; }
+        .float-up { color: #4caf50; }
+        .float-down { color: #f44336; }
+        @keyframes floatUp { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-50px) scale(1.3); opacity: 0; } }
+
+        /* 右側面板：隊伍狀態與足跡檢討區 */
+        .side-panel { width: 500px; height: 850px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding-right: 10px; }
+        .side-panel::-webkit-scrollbar { width: 8px; }
+        .side-panel::-webkit-scrollbar-thumb { background: var(--secondary-color); border-radius: 4px; }
+        
+        .team-card { background: var(--white); padding: 15px; border-radius: 16px; box-shadow: 0 4px 15px rgba(140, 126, 153, 0.1); border-left: 8px solid var(--secondary-color); transition: 0.3s; display: flex; flex-direction: column; }
+        .team-card.active { border-left-color: var(--success); transform: translateX(-10px); box-shadow: -8px 8px 20px rgba(139, 184, 156, 0.3); }
+        .team-card.dead { filter: grayscale(100%); opacity: 0.5; border-left-color: var(--danger); }
+        
+        .team-top-row { display: flex; align-items: center; gap: 15px; margin-bottom: 10px; }
+        .team-avatar img { width: 60px; height: 60px; object-fit: contain; background: #faf9fb; border-radius: 50%; padding: 5px; border: 2px solid var(--secondary-color); }
+        .team-info { flex-grow: 1; }
+        .team-name { font-size: 1.2em; font-weight: bold; color: var(--text-main); display: flex; justify-content: space-between; align-items: center; }
+        .team-pop { font-size: 1.4em; color: var(--primary-color); font-weight: 900; margin: 3px 0; }
+        .team-mutations { font-size: 0.85em; color: #777; font-weight: bold; }
+
+        /* 足跡檢討專屬格子 */
+        .footprint-box { border-top: 1px dashed var(--secondary-color); padding-top: 10px; display: flex; gap: 8px; overflow-x: auto; white-space: nowrap; padding-bottom: 8px; }
+        .footprint-box::-webkit-scrollbar { height: 6px; }
+        .footprint-box::-webkit-scrollbar-thumb { background: #d1cbd6; border-radius: 3px; }
+        
+        .fp-item { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 10px; border-radius: 8px; font-size: 0.8em; min-width: 60px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .fp-gain { background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32; }
+        .fp-loss { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; }
+        .fp-neutral { background: #f3e5f5; border: 1px solid #ce93d8; color: #6a1b9a; }
+        .fp-icon { font-size: 1.5em; margin-bottom: 2px; }
+        .fp-text { font-weight: 900; }
+
+        /* 彈出視窗 (Modal) */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--modal-bg); z-index: 100; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .modal-content { background: var(--white); width: 500px; padding: 40px; border-radius: 24px; text-align: center; box-shadow: 0 15px 40px rgba(0,0,0,0.3); position: relative; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); border: 4px solid var(--primary-color); }
+        @keyframes popIn { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-pic { font-size: 60px; margin-bottom: 10px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15)); }
+        .modal-title { font-size: 2em; color: var(--primary-color); margin-top: 0; margin-bottom: 15px; font-weight: 900; }
+        .modal-desc { font-size: 1.2em; color: #444; line-height: 1.6; margin: 20px 0; font-weight: bold; }
+        
+        /* 減傷特效動畫 */
+        .shield-effect { display: none; background: #f3e5f5; color: #8e24aa; padding: 12px; border-radius: 10px; border: 2px solid #ce93d8; font-weight: 900; margin: 20px 0; font-size: 1.1em; animation: flashShield 1.5s infinite alternate; }
+        @keyframes flashShield { from { box-shadow: 0 0 5px #ce93d8; } to { box-shadow: 0 0 25px #ab47bc; } }
+
+        /* 地圖格子的位置定位 */
+        #tile-0 { grid-area: 1 / 1 / 2 / 2; } #tile-1 { grid-area: 1 / 2 / 2 / 3; } #tile-2 { grid-area: 1 / 3 / 2 / 4; } #tile-3 { grid-area: 1 / 4 / 2 / 5; } #tile-4 { grid-area: 1 / 5 / 2 / 6; }
+        #tile-5 { grid-area: 2 / 5 / 3 / 6; } #tile-6 { grid-area: 3 / 5 / 4 / 6; } #tile-7 { grid-area: 4 / 5 / 5 / 6; } #tile-8 { grid-area: 5 / 5 / 6 / 6; } #tile-9 { grid-area: 5 / 4 / 6 / 5; }
+        #tile-10 { grid-area: 5 / 3 / 6 / 4; } #tile-11 { grid-area: 5 / 2 / 6 / 3; } #tile-12 { grid-area: 5 / 1 / 6 / 2; } #tile-13 { grid-area: 4 / 1 / 5 / 2; } #tile-14 { grid-area: 3 / 1 / 4 / 2; } #tile-15 { grid-area: 2 / 1 / 3 / 2; }
+    </style>
+</head>
+<body>
+
+<h1>⚡ 寶可夢生態系：足跡檢討觀測站 ⚡</h1>
+
+<div id="setup-screen">
+    <h2 style="color: var(--primary-color); font-size: 2em; margin-top:0;">探索隊伍招募 (最多6組)</h2>
+    <div class="setup-row">
+        <input type="text" id="team-input" placeholder="輸入組別名稱 (如: 第一組)">
+    </div>
+    <div class="setup-row">
+        <button class="gacha-btn" onclick="rollGacha()">🎰 點擊扭蛋抽取代表寶可夢！</button>
+    </div>
+    <div id="gacha-result" class="gacha-result"></div>
+    
+    <div id="setup-teams-list" style="margin: 20px 0; text-align: left; background: #faf9fb; padding: 20px; border-radius: 12px; min-height: 50px; font-size: 1.1em; line-height: 1.8; border: 2px solid var(--secondary-color);">
+        目前尚未加入隊伍。
+    </div>
+    <button onclick="startGame()" id="start-btn" style="display:none; font-size: 1.4em; padding: 15px 40px; width: 100%; border-radius: 12px;">進入生態系地圖</button>
+</div>
+
+<div id="game-screen">
+    <div class="board" id="board">
+        <div class="center-panel">
+            <div class="rules-box">
+                <h3>📖 生物多樣性求生指南</h3>
+                1. 初始族群為 <strong>5000隻</strong>。<br>
+                2. 低於 <strong>100隻</strong> 則遭遇滅絕淘汰。<br>
+                3. 天敵對應表：<br>
+                &nbsp;&nbsp;🦅 <strong>老鷹 (骰1,2)</strong>：【挖洞】或【保護色】減免10%<br>
+                &nbsp;&nbsp;🐆 <strong>石虎 (骰3,4)</strong>：【挖洞】或【感官】減免10%<br>
+                &nbsp;&nbsp;🐍 <strong>毒蛇 (骰5,6)</strong>：【速度】或【抗毒】減免10%<br>
+                4. 各項天賦優勢可疊加。<br>
+                5. <strong>生存競爭</strong>：停留同格時，數量少者額外損失 10%。
+            </div>
+            <div class="dice-area">
+                <h2 id="current-turn-display" style="margin:5px 0; color: var(--primary-color); font-size: 1.5em; font-weight: 900;">準備開始</h2>
+                <div class="dice-result" id="dice-display">🎲</div>
+                <button id="roll-btn" style="font-size: 1.3em; padding: 15px 30px; border-radius: 12px;" onclick="takeTurn()">擲骰子移動</button>
+            </div>
+            <div class="log-box" id="log-box"></div>
+        </div>
+    </div>
+    
+    <div class="side-panel" id="teams-container"></div>
+</div>
+
+<div class="modal-overlay" id="event-modal">
+    <div class="modal-content">
+        <div class="modal-pic" id="modal-pic">⚠️</div>
+        <h2 class="modal-title" id="modal-title">事件標題</h2>
+        <div class="modal-desc" id="modal-desc">事件描述內容...</div>
+        <div class="shield-effect" id="modal-shield">🛡️ 特性觸發！減免傷害！</div>
+        <div id="modal-actions"></div>
+    </div>
+</div>
+
+<script>
+    // 遊戲資料
+    const mutations = { 1: '速', 2: '挖', 3: '色', 4: '敏', 5: '抵', 6: '毒' };
+    const mutationFull = { '速': '速度快', '挖': '擅長挖洞', '色': '保護色', '敏': '感官敏銳', '抵': '具抵抗力', '毒': '具抗毒性' };
+    
+    // 扭蛋池
+    const gachaPool = [
+        { img: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png', name: '皮卡丘', startTrait: '速' },
+        { img: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/27.png', name: '穿山鼠', startTrait: '挖' },
+        { img: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/352.png', name: '變隱龍', startTrait: '色' },
+        { img: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/448.png', name: '路卡利歐', startTrait: '敏' },
+        { img: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/113.png', name: '吉利蛋', startTrait: '抵' },
+        { img: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/24.png', name: '阿柏怪', startTrait: '毒' }
+    ];
+
+    // 大富翁格子設計
+    const spaces = [
+        { pic: "🏁", name: "冒險起點", desc: "準備出發", type: "start" },
+        { pic: "🪹", name: "安樂窩", desc: "族群 +10%", type: "safe" },
+        { pic: "⚠️", name: "天敵出現", desc: "擲骰決定遭遇的天敵，基礎族群 -30%", type: "predator" },
+        { pic: "🍄", name: "有毒植物", desc: "族群 -20%", type: "poison" },
+        { pic: "🌸", name: "繁殖季節", desc: "通過+50%, 停留獲技能", type: "breed" },
+        { pic: "⚠️", name: "天敵出現", desc: "擲骰決定遭遇的天敵，基礎族群 -30%", type: "predator" },
+        { pic: "🏹", name: "狩獵季節", desc: "族群 -30%", type: "hunt" },
+        { pic: "🪹", name: "安樂窩", desc: "族群 +10%", type: "safe" },
+        { pic: "🔥", name: "森林大火", desc: "全體 -50%", type: "fire_all" },
+        { pic: "⚠️", name: "天敵出現", desc: "擲骰決定遭遇的天敵，基礎族群 -30%", type: "predator" },
+        { pic: "🍄", name: "有毒植物", desc: "族群 -20%", type: "poison" },
+        { pic: "💧", name: "豐沛水源", desc: "族群 +20%", type: "water" },
+        { pic: "🦠", name: "傳染病爆發", desc: "手動擲骰，全體 -X0%", type: "disease_all" },
+        { pic: "👾", name: "外來種入侵", desc: "族群 -30%", type: "alien" },
+        { pic: "🧬", name: "有利突變", desc: "獲得遺傳天賦", type: "mutation" },
+        { pic: "🚜", name: "濫墾山坡地", desc: "全體 -50%", type: "deforest_all" }
+    ];
+
+    let teams = [];
+    let currentTurnIndex = 0;
+    let isMoving = false;
+    let pendingEvent = null; 
+
+    // --- 扭蛋與設定 ---
+    function rollGacha() {
+        if (teams.length >= 6) return alert("最多只能有6組隊伍！");
+        const input = document.getElementById('team-input');
+        const teamName = input.value.trim() || `第 ${teams.length + 1} 組`;
+        
+        const resultDiv = document.getElementById('gacha-result');
+        const gachaBtn = document.querySelector('.gacha-btn');
+        gachaBtn.disabled = true;
+        
+        let count = 0;
+        let rollAnim = setInterval(() => {
+            let randomPoke = gachaPool[Math.floor(Math.random() * gachaPool.length)];
+            resultDiv.innerHTML = `<div>🎰 扭蛋轉動中...</div><img class="gacha-img-preview" src="${randomPoke.img}">`;
+            count++;
+            if (count > 15) {
+                clearInterval(rollAnim);
+                let finalPoke = gachaPool[Math.floor(Math.random() * gachaPool.length)];
+                resultDiv.innerHTML = `
+                    <div style="color:var(--text-main);">🎉 招募到 <strong>${finalPoke.name}</strong>！</div>
+                    <img class="gacha-img-preview" src="${finalPoke.img}" style="transform: scale(1.2); margin: 10px 0;">
+                `;
+                
+                teams.push({ 
+                    id: teams.length, name: teamName, avatarImg: finalPoke.img, pokeName: finalPoke.name,
+                    pop: 5000, pos: 0, isAlive: true, mutations: new Set([finalPoke.startTrait]),
+                    footprints: [{ icon: "🏁", text: "起始 5000", type: "neutral" }]
+                });
+                
+                input.value = "";
+                renderSetupTeams();
+                document.getElementById('start-btn').style.display = "block";
+                gachaBtn.disabled = false;
+            }
+        }, 60);
+    }
+
+    function renderSetupTeams() {
+        document.getElementById('setup-teams-list').innerHTML = teams.map(t => 
+            `<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; border-bottom:1px solid #e0e0e0; padding-bottom:8px;">
+                <img src="${t.avatarImg}" style="width:40px; height:40px; background:#fff; border-radius:50%; border:1px solid var(--secondary-color);">
+                <strong>${t.name}</strong> (${t.pokeName}) - 天賦: ${Array.from(t.mutations).map(m=>mutationFull[m]).join('')}
+            </div>`
+        ).join("");
+    }
+
+    function startGame() {
+        document.getElementById('setup-screen').style.display = "none";
+        document.getElementById('game-screen').style.display = "flex";
+        renderBoard();
+        log("🎉 <strong>生態冒險正式開始！</strong>");
+        updateUI();
+    }
+
+    function renderBoard() {
+        const boardDiv = document.getElementById('board');
+        spaces.forEach((space, index) => {
+            const tile = document.createElement('div');
+            tile.className = 'tile';
+            tile.id = `tile-${index}`;
+            tile.innerHTML = `<div class="tile-pic">${space.pic}</div><div class="tile-title">${space.name}</div><div class="tile-desc">${space.desc}</div><div class="players-container" id="players-tile-${index}"></div>`;
+            boardDiv.appendChild(tile);
+        });
+    }
+
+    // --- 核心工具與動畫 ---
+    const rollDie = () => Math.floor(Math.random() * 6) + 1;
+    const log = (msg) => {
+        const box = document.getElementById('log-box');
+        box.innerHTML = `<div style="margin-bottom:8px; border-bottom: 1px dashed var(--secondary-color); padding-bottom:5px;">${msg}</div>` + box.innerHTML;
+    };
+
+    function showFloatingText(tileIndex, amount) {
+        const container = document.getElementById(`players-tile-${tileIndex}`);
+        const floatEl = document.createElement('div');
+        floatEl.className = `floating-text ${amount > 0 ? 'float-up' : 'float-down'}`;
+        floatEl.innerText = amount > 0 ? `+${amount}` : amount;
+        floatEl.style.left = `${30 + (Math.random() * 40 - 20)}%`; 
+        floatEl.style.bottom = '30px';
+        container.appendChild(floatEl);
+        setTimeout(() => floatEl.remove(), 1500);
+    }
+
+    function applyPopulationChange(team, percentage, reason, icon = "❓") {
+        if (!team.isAlive) return;
+        let roundedChange = Math.round((team.pop * percentage) / 100) * 100;
+        
+        if (roundedChange !== 0) {
+            team.pop += roundedChange;
+            let sign = roundedChange > 0 ? "+" : "";
+            
+            let fpType = roundedChange > 0 ? "gain" : "loss";
+            team.footprints.push({ icon: icon, text: `${reason}<br>${sign}${roundedChange}`, type: fpType });
+            
+            log(`<img src="${team.avatarImg}" style="width:20px; vertical-align:middle;"> ${team.name} 因 [${reason}]，數量 ${sign}${roundedChange}。`);
+            showFloatingText(team.pos, roundedChange);
+        }
+        
+        if (team.pop < 100 && team.isAlive) {
+            team.isAlive = false;
+            team.pop = 0;
+            team.footprints.push({ icon: "💀", text: "慘遭滅絕", type: "loss" });
+            log(`💀 <strong>${team.name} 族群數量低於100，已被大自然淘汰！</strong>`);
+        }
+    }
+
+    // --- 遊戲邏輯與彈出視窗 ---
+    async function takeTurn() {
+        if (isMoving) return;
+        let team = teams[currentTurnIndex];
+        if (!team.isAlive) { finishTurn(); return; }
+
+        isMoving = true;
+        document.getElementById('roll-btn').disabled = true;
+
+        let steps = rollDie();
+        let display = document.getElementById('dice-display');
+        let rollCount = 0;
+        
+        let rollInterval = setInterval(async () => {
+            display.innerText = "🎲 " + rollDie();
+            rollCount++;
+            if (rollCount > 8) {
+                clearInterval(rollInterval);
+                display.innerText = "🎲 " + steps;
+                log(`▶️ ${team.name} 擲出 <strong>${steps}</strong> 步。`);
+                
+                for (let i = 0; i < steps; i++) {
+                    let oldPos = team.pos;
+                    team.pos = (team.pos + 1) % 16;
+                    updateBoardPositions();
+                    await new Promise(r => setTimeout(r, 400));
+                    
+                    if (oldPos === 3 && team.pos === 4) {
+                        log(`🌸 ${team.name} 通過【繁殖季節】，族群大增！`);
+                        applyPopulationChange(team, 0.5, "通過繁殖", "🌸");
+                        updateUI();
+                        await new Promise(r => setTimeout(r, 500));
+                    }
+                }
+                triggerTileEvent(team, spaces[team.pos]);
+            }
+        }, 70);
+    }
+
+    function showModal(pic, title, desc, shieldText = "", actionHtml) {
+        document.getElementById('modal-pic').innerText = pic;
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-desc').innerHTML = desc;
+        
+        const shieldDiv = document.getElementById('modal-shield');
+        if (shieldText) {
+            shieldDiv.innerText = shieldText;
+            shieldDiv.style.display = 'block';
+        } else {
+            shieldDiv.style.display = 'none';
+        }
+
+        document.getElementById('modal-actions').innerHTML = actionHtml;
+        document.getElementById('event-modal').style.display = 'flex';
+    }
+
+    function triggerTileEvent(team, space) {
+        pendingEvent = { team, space }; 
+        let title = `${space.name}`;
+        let desc = "";
+        let shieldText = "";
+        let btnHtml = `<button style="font-size:1.2em; padding:12px 30px;" onclick="executePendingEvent()">確認並結算</button>`;
+
+        switch (space.type) {
+            case "start":
+            case "safe":
+            case "water":
+            case "hunt":
+            case "alien":
+            case "deforest_all":
+                desc = `抵達了 ${space.name}！<br><br>${space.desc}`;
+                break;
+            case "poison":
+                desc = `不小心誤食了有毒植物！基礎傷害 -20%。`;
+                if (team.mutations.has("毒")) shieldText = `🛡️ 具備【抗毒性】，傷害減免為 -10%！`;
+                break;
+            case "predator":
+                desc = `遭遇天敵潛伏區！<br>請手動擲骰決定會遇到哪種天敵，以及造成的傷害。`;
+                btnHtml = `<button onclick="rollPredatorDice()" style="background-color:#eab308; color:#fff; font-size:1.3em; padding:15px 30px;">🎲 擲骰決定遭遇天敵</button>`;
+                break;
+            case "mutation":
+            case "breed":
+                let mRoll = rollDie();
+                let newMut = mutations[mRoll];
+                desc = `獲得了全新的遺傳天賦：<br><br><span style="font-size:1.5em; color:var(--primary-color);">【${mutationFull[newMut]}】</span>`;
+                pendingEvent.newMut = newMut;
+                break;
+            case "fire_all":
+                desc = `發生全體災難事件！<br>所有存活隊伍將扣除 50% 數量。`;
+                let protectedTeams = teams.filter(t => t.isAlive && (t.mutations.has("速") || t.mutations.has("挖")));
+                if (protectedTeams.length > 0) shieldText = `🛡️ ${protectedTeams.map(t=>t.name).join('、')} 具備速度或挖洞，減免 10% 傷害！`;
+                break;
+            case "disease_all":
+                desc = `這是一場全體災難！請手動擲骰決定傳染病的嚴重程度 (-X0%)。`;
+                btnHtml = `<button onclick="rollDiseaseDice()" style="background-color:var(--danger); font-size:1.3em; padding:15px 30px;">🎲 擲骰決定嚴重程度</button>`;
+                break;
+        }
+
+        showModal(space.pic, title, desc, shieldText, btnHtml);
+    }
+
+    // --- 專屬：天敵隨機判定邏輯 ---
+    function rollPredatorDice() {
+        let pRoll = rollDie();
+        let team = pendingEvent.team;
+        let enemy = "";
+        let eIcon = "";
+        let shieldText = "";
+        let hasShield = false;
+
+        // 判斷擲出的是哪種天敵
+        if (pRoll === 1 || pRoll === 2) {
+            enemy = "老鷹"; eIcon = "🦅";
+            if (team.mutations.has("挖") || team.mutations.has("色")) hasShield = true;
+        } else if (pRoll === 3 || pRoll === 4) {
+            enemy = "石虎"; eIcon = "🐆";
+            if (team.mutations.has("挖") || team.mutations.has("敏")) hasShield = true;
+        } else {
+            enemy = "毒蛇"; eIcon = "🐍";
+            if (team.mutations.has("速") || team.mutations.has("毒")) hasShield = true;
+        }
+
+        // 存入 pendingEvent 供結算使用
+        pendingEvent.enemy = enemy;
+        pendingEvent.eIcon = eIcon;
+        pendingEvent.hasShield = hasShield;
+
+        let desc = `骰出了 <strong>${pRoll} 點</strong>！<br>遭遇天敵：<strong style="font-size:1.3em;">${eIcon} ${enemy}</strong><br>基礎傷害 -30%。`;
+        
+        if (hasShield) {
+            shieldText = `🛡️ 依靠遺傳天賦完美應對，減免 10% 傷害！`;
+        } else {
+            shieldText = "";
+        }
+
+        showModal(eIcon, `⚠️ 天敵結算`, desc, shieldText, `<button style="font-size:1.2em; padding:12px 30px;" onclick="executePendingEvent()">確認並結算</button>`);
+    }
+
+    function rollDiseaseDice() {
+        let dRoll = rollDie();
+        let dDamage = -(dRoll * 0.1);
+        pendingEvent.dDamage = dDamage;
+        
+        let desc = `骰出了 <strong>${dRoll} 點</strong>！<br>基礎傷害為 <strong>-${dRoll}0%</strong>。`;
+        let protectedTeams = teams.filter(t => t.isAlive && t.mutations.has("抵"));
+        let shieldText = "";
+        if (protectedTeams.length > 0) shieldText = `🛡️ ${protectedTeams.map(t=>t.name).join('、')} 具備【抵抗力】，減免 10% 傷害！`;
+
+        showModal("🦠", `異常狀態傳染結算`, desc, shieldText, `<button style="font-size:1.2em; padding:12px 30px;" onclick="executePendingEvent()">確認並全體結算</button>`);
+    }
+
+    function executePendingEvent() {
+        document.getElementById('event-modal').style.display = 'none';
+        let team = pendingEvent.team;
+        let space = pendingEvent.space;
+
+        switch (space.type) {
+            case "safe": applyPopulationChange(team, 0.1, "安樂窩", space.pic); break;
+            case "water": applyPopulationChange(team, 0.2, "豐沛水源", space.pic); break;
+            case "hunt": applyPopulationChange(team, -0.3, "狩獵季節", space.pic); break;
+            case "alien": applyPopulationChange(team, -0.3, "外來種入侵", space.pic); break;
+            case "poison":
+                let pDamage = team.mutations.has("毒") ? -0.1 : -0.2;
+                applyPopulationChange(team, pDamage, "有毒植物", space.pic); break;
+            case "predator":
+                // 讀取 rollPredatorDice 判定好的結果
+                let eDamage = pendingEvent.hasShield ? -0.2 : -0.3;
+                applyPopulationChange(team, eDamage, `遭遇${pendingEvent.enemy}`, pendingEvent.eIcon);
+                break;
+            case "mutation":
+            case "breed":
+                team.mutations.add(pendingEvent.newMut);
+                team.footprints.push({ icon: "🧬", text: `獲得天賦<br>【${mutationFull[pendingEvent.newMut]}】`, type: "neutral" });
+                break;
+            case "fire_all":
+                teams.forEach(t => {
+                    if (t.isAlive) {
+                        let fDamage = (t.mutations.has("速") || t.mutations.has("挖")) ? -0.4 : -0.5;
+                        applyPopulationChange(t, fDamage, "森林大火", space.pic);
+                    }
+                });
+                break;
+            case "disease_all":
+                teams.forEach(t => {
+                    if (t.isAlive) {
+                        let finalDmg = pendingEvent.dDamage + (t.mutations.has("抵") ? 0.1 : 0);
+                        applyPopulationChange(t, finalDmg, "傳染病", space.pic);
+                    }
+                });
+                break;
+            case "deforest_all":
+                teams.forEach(t => { if (t.isAlive) applyPopulationChange(t, -0.5, "棲息地破壞", space.pic); });
+                break;
+        }
+
+        checkSurvivalCompetition(team);
+        updateUI();
+        finishTurn();
+    }
+
+    function checkSurvivalCompetition(currentTeam) {
+        if (!currentTeam.isAlive) return;
+        teams.forEach(otherTeam => {
+            if (otherTeam.id !== currentTeam.id && otherTeam.isAlive && otherTeam.pos === currentTeam.pos) {
+                log(`⚔️ <strong>【生存競爭】</strong> ${currentTeam.name} 與 ${otherTeam.name} 停在同一格！`);
+                if (currentTeam.pop > otherTeam.pop) { applyPopulationChange(otherTeam, -0.1, "競爭失敗", "⚔️"); } 
+                else if (otherTeam.pop > currentTeam.pop) { applyPopulationChange(currentTeam, -0.1, "競爭失敗", "⚔️"); }
+            }
+        });
+    }
+
+    function finishTurn() {
+        let aliveTeams = teams.filter(t => t.isAlive);
+        if (aliveTeams.length === 0) {
+            log("🚨 <strong>所有族群皆已滅絕，生態系崩潰！遊戲結束！</strong>");
+            document.getElementById('current-turn-display').innerText = "遊戲結束";
+            document.getElementById('roll-btn').style.display = "none";
+            return;
+        }
+        
+        do { currentTurnIndex = (currentTurnIndex + 1) % teams.length; } while (!teams[currentTurnIndex].isAlive);
+        
+        isMoving = false;
+        document.getElementById('roll-btn').disabled = false;
+        updateUI();
+    }
+
+    function updateBoardPositions() {
+        document.querySelectorAll('.players-container').forEach(el => el.innerHTML = "");
+        teams.forEach(team => {
+            if (team.isAlive) {
+                let token = document.createElement('div');
+                token.className = 'player-token';
+                token.innerHTML = `<img src="${team.avatarImg}">`;
+                if(team.mutations.size > 0) {
+                    let tags = document.createElement('div');
+                    tags.className = 'skill-tags';
+                    team.mutations.forEach(m => { tags.innerHTML += `<div class="skill-tag">${m}</div>`; });
+                    token.appendChild(tags);
+                }
+                document.getElementById(`players-tile-${team.pos}`).appendChild(token);
+            }
+        });
+    }
+
+    function updateUI() {
+        updateBoardPositions();
+        const container = document.getElementById('teams-container');
+        container.innerHTML = "";
+        
+        teams.forEach((team, index) => {
+            let mutList = Array.from(team.mutations).map(m => mutationFull[m]).join('、');
+            let statusClass = !team.isAlive ? "dead" : (index === currentTurnIndex ? "active" : "");
+            
+            // 渲染足跡 HTML
+            let footprintsHtml = team.footprints.map(fp => `
+                <div class="fp-item fp-${fp.type}">
+                    <div class="fp-icon">${fp.icon}</div>
+                    <div class="fp-text">${fp.text}</div>
+                </div>
+            `).join('');
+
+            container.innerHTML += `
+                <div class="team-card ${statusClass}">
+                    <div class="team-top-row">
+                        <div class="team-avatar"><img src="${team.avatarImg}"></div>
+                        <div class="team-info">
+                            <div class="team-name">
+                                <span>${team.name}</span>
+                                <span style="font-size:0.75em; color:#999; font-weight:normal;">${team.pokeName}</span>
+                            </div>
+                            <div class="team-pop">${team.pop} 隻</div>
+                            <div class="team-mutations"><strong>天賦：</strong>${mutList || "無"}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="footprint-box" id="fp-box-${team.id}">
+                        ${footprintsHtml}
+                    </div>
+                </div>
+            `;
+        });
+
+        // 確保足跡捲軸永遠自動滾到最右邊（看到最新進度）
+        teams.forEach(team => {
+            let fpBox = document.getElementById(`fp-box-${team.id}`);
+            if(fpBox) fpBox.scrollLeft = fpBox.scrollWidth;
+        });
+
+        if (teams[currentTurnIndex] && teams[currentTurnIndex].isAlive) {
+            document.getElementById('current-turn-display').innerText = `現在輪到：${teams[currentTurnIndex].name}`;
+        }
+    }
+</script>
+</body>
+</html>
